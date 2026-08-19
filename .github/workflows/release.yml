@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Generate and compare without committing, tagging, or publishing"
+        type: boolean
+        default: true
+      publish:
+        description: "Publish a package if data changed (ignored when dry_run is true)"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-data:
+    name: Update KeystoneMetaData.lua
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push'
+    outputs:
+      data_changed: ${{ steps.result.outputs.data_changed }}
+      dry_run: ${{ steps.flags.outputs.dry_run }}
+      publish: ${{ steps.flags.outputs.publish }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Run updater regression tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Resolve dispatch flags
+        id: flags
+        run: |
+          DRY_RUN="false"
+          PUBLISH="false"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DRY_RUN="${{ github.event.inputs.dry_run }}"
+            PUBLISH="${{ github.event.inputs.publish }}"
+            if [ "$DRY_RUN" != "false" ]; then
+              DRY_RUN="true"
+              PUBLISH="false"
+            fi
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            PUBLISH="true"
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+
+      - name: Run update_keystone_meta.py
+        env:
+          RAIDER_IO_API_KEY: ${{ secrets.RAIDER_IO_API_KEY }}
+        run: |
+          ARGS=(--affix-mode season --target-runs 500)
+          if [ "${{ steps.flags.outputs.dry_run }}" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+          python update_keystone_meta.py "${ARGS[@]}"
+
+      - name: Commit and push KeystoneMetaData.lua (if changed)
+        id: commit_data
+        if: steps.flags.outputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add KeystoneMetaData.lua
+          if git diff --cached --quiet; then
+            echo "No material changes to KeystoneMetaData.lua - skipping commit."
+            echo "data_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore(data): refresh KeystoneMetaData.lua [skip ci]"
+            git push
+            echo "data_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record data-change result
+        id: result
+        run: |
+          if [ "${{ steps.flags.outputs.dry_run }}" = "true" ]; then
+            echo "data_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "data_changed=${{ steps.commit_data.outputs.data_changed || 'false' }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Package and Release
+    runs-on: ubuntu-latest
+    needs: update-data
+    if: |
+      always() && (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'schedule' && needs.update-data.outputs.data_changed == 'true') ||
+        (github.event_name == 'workflow_dispatch' && needs.update-data.outputs.publish == 'true' && needs.update-data.outputs.data_changed == 'true')
+      )
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
+
+      - name: Create local auto tag for daily release type
+        if: github.event_name != 'push'
+        run: |
+          git fetch --tags
+          TAG="vdata-$(date -u +'%Y-%m-%d')"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; using a recovery tag instead of moving it."
+            TAG="${TAG}-run${GITHUB_RUN_NUMBER}"
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Published release tag: $TAG"
+
+      - name: Build and release with BigWigs packager
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CURSEFORGE_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reject synthetic visual fixture
+        run: |
+          python -c "from pathlib import Path; import sys; sys.path.insert(0, 'tests'); import validate_zip; validate_zip.validate_release_data(Path('KeystoneMetaData.lua'))"
+
+      - name: Validate package ZIP layout
+        run: |
+          python tests/validate_zip.py .release/*.zip

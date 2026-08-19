@@ -1,0 +1,9 @@
+{
+  "_comment": "SYNTHETIC fixture. Not live Raider.IO data.",
+  "region": "us",
+  "title": "Synthetic Affixes",
+  "affix_details": [
+    {"id": 9, "name": "Tyrannical", "slug": "tyrannical"},
+    {"id": 10, "name": "Fortified", "slug": "fortified"}
+  ]
+}

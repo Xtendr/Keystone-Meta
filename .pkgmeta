@@ -1,0 +1,15 @@
+package-as: KeystoneMeta
+
+curse-project-id: 1660185
+
+ignore:
+  - update_keystone_meta.py
+  - Assets/generate_logo.py
+  - .github
+  - tests
+  - docs
+  - .pkgmeta
+  - .env.example
+  - .gitignore
+  - tools
+  - .visual_fixture_backup

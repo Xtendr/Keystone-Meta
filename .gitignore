@@ -1,0 +1,45 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.swp
+*.swo
+*~
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Local secrets
+api.txt
+secrets.txt
+*.secret
+
+# Packager / build output
+.release/
+release/
+*.zip
+
+# Local visual-fixture backup (never commit)
+.visual_fixture_backup/
+
+# Local generator logs
+.generator_run.log
+
+# WoW client-only leftovers
+WTF/
+Cache/

@@ -1,0 +1,57 @@
+{
+  "_comment": "SYNTHETIC fixture. Not live Raider.IO data.",
+  "seasons": [
+    {
+      "slug": "season-mn-2",
+      "name": "Synthetic Season 2",
+      "is_main_season": true,
+      "starts": {
+        "us": "2026-08-18T15:00:00Z",
+        "eu": "2026-08-19T04:00:00Z"
+      },
+      "ends": {
+        "us": "2030-01-01T00:00:00Z",
+        "eu": "2030-01-01T00:00:00Z"
+      },
+      "dungeons": [
+        {
+          "id": 1001,
+          "challenge_mode_id": 588,
+          "slug": "altar-of-fangs",
+          "name": "Altar of Fangs",
+          "short_name": "AOF"
+        }
+      ]
+    },
+    {
+      "slug": "season-mn-1",
+      "name": "Synthetic Season 1",
+      "is_main_season": true,
+      "starts": {
+        "us": "2026-03-24T15:00:00Z",
+        "eu": "2026-03-25T04:00:00Z"
+      },
+      "ends": {
+        "us": "2026-08-18T15:00:00Z",
+        "eu": "2026-08-19T04:00:00Z"
+      },
+      "dungeons": [
+        {
+          "id": 2001,
+          "challenge_mode_id": 560,
+          "slug": "maisara-caverns",
+          "name": "Maisara Caverns",
+          "short_name": "MC"
+        },
+        {
+          "id": 2002,
+          "challenge_mode_id": 585,
+          "slug": "voidscar-arena",
+          "name": "Voidscar Arena",
+          "short_name": "VSA"
+        }
+      ]
+    }
+  ],
+  "dungeons": []
+}
