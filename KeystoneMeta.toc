@@ -5,6 +5,7 @@
 ## Version: 0.1.0
 ## IconTexture: Interface\AddOns\KeystoneMeta\Assets\KeystoneMeta_logo
 ## SavedVariables: KeystoneMetaDB
+## X-Curse-Project-ID: 1660185
 
 libs\LibStub\LibStub.lua
 libs\LibDBIcon-1.0\CallbackHandler-1.0\CallbackHandler-1.0.lua

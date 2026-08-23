@@ -132,6 +132,8 @@ jobs:
 
       - name: Build and release with BigWigs packager
         uses: BigWigsMods/packager@v2
+        with:
+          args: "-p 1660185"
         env:
           CF_API_KEY: ${{ secrets.CURSEFORGE_TOKEN }}
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

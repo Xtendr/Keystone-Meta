@@ -16,9 +16,9 @@ class PackageLayoutTests(TestCase):
         self.assertIn("package-as: KeystoneMeta", text)
         self.assertIn("curse-project-id: 1660185", text)
 
-    def test_toc_has_no_invented_curse_id(self):
+    def test_toc_has_curse_project_id(self):
         text = (ROOT / "KeystoneMeta.toc").read_text(encoding="utf-8")
-        self.assertNotIn("X-Curse-Project-ID", text)
+        self.assertIn("## X-Curse-Project-ID: 1660185", text)
         self.assertIn("## Interface: 120100", text)
         self.assertIn("KeystoneMetaDB", text)
 
