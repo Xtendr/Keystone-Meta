@@ -2447,7 +2447,7 @@ local function CreateMainPanel()
     end)
 
     frame.close = CreateChromeCloseButton(frame, function()
-        dismissedThisChallengesSession = IsChallengesVisible()
+        dismissedThisChallengesSession = true
         HideMain()
     end)
     frame.settingsBtn = CreateChromeSettingsButton(frame, frame.close, ToggleSettings)
@@ -2955,8 +2955,8 @@ end
 
 local function ToggleWindow()
     EnsureUI()
-    if mainFrame:IsShown() then
-        dismissedThisChallengesSession = IsChallengesVisible()
+    if mainFrame and mainFrame:IsShown() then
+        dismissedThisChallengesSession = true
         HideMain()
         return
     end
@@ -2983,7 +2983,6 @@ local function OnChallengesShow()
 end
 
 local function OnChallengesHide()
-    dismissedThisChallengesSession = false
     holdStandaloneUntilReanchor = false
     HideMain()
 end

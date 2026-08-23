@@ -168,8 +168,15 @@ class LuaPlacementContractTests(TestCase):
         )[0]
         self.assertIn("ShowMain()", show)
         self.assertIn("ScheduleReanchor()", show)
+        self.assertIn("if dismissedThisChallengesSession then", show)
         self.assertIn("HideMain()", hide)
+        self.assertNotIn("dismissedThisChallengesSession = false", hide)
         self.assertNotIn("RestoreStandalonePosition()", hide)
+        toggle = self.lua.split("local function ToggleWindow()", 1)[1].split(
+            "local function ReevaluatePlacement()", 1
+        )[0]
+        self.assertIn("dismissedThisChallengesSession = true", toggle)
+        self.assertNotIn("IsChallengesVisible()", toggle)
         hook = self.lua.split("local function HookChallenges()", 1)[1].split(
             "local function InitializeMinimap()", 1
         )[0]
