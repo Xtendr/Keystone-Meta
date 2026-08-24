@@ -19,9 +19,10 @@ Popularity is not the same as power or success rate. This is not a tier list, a 
 
 ## Usage
 
-- `/kmeta` or `/keystonemeta` toggles the compact companion panel.
-- Left-click the minimap button to toggle the same panel.
-- The panel attaches to the right of Blizzard’s Mythic+ Challenges frame when that frame is open, and can be dragged as a standalone window when it is not.
+- Left-click the minimap button to open settings.
+- Right-click the minimap button, or `/kmeta` / `/keystonemeta`, to toggle the Group Finder companion on or off.
+- When the companion is on, it attaches to Blizzard’s Mythic+ Challenges frame whenever that frame is open. Closing the panel or toggling it off keeps it hidden until you turn it on again.
+- The panel can be dragged as a standalone window when Group Finder is closed.
 - The default view follows your current specialization unless you override it by clicking the specialization name.
 - Click a populated dungeon row to open a Dungeon Detail popout for that dungeon.
 

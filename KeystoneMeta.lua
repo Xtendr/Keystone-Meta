@@ -22,6 +22,7 @@ local DB_DEFAULTS = {
     windowPosition = nil,
     attachedOffset = nil,
     settingsPosition = nil,
+    autoShowWithChallenges = true,
 }
 
 local DISCLAIMER = "Keystone Meta shows specialization representation among sampled top-ranked completed Mythic+ runs. Representation does not measure success rate or prove specialization strength."
@@ -58,7 +59,7 @@ local MAIN_H_PENDING = 220
 local MAIN_H_POPULATED = 370
 local MAIN_H_MAX = 480
 local DETAIL_W, DETAIL_H = 348, 380
-local SETTINGS_W = 298
+local SETTINGS_W = 340
 local SETTINGS_LABEL_W = 118
 local PAD = 12
 local TOP_PAD = 10
@@ -114,6 +115,7 @@ local dropdownCatcher
 local challengesHooked = false
 local holdStandaloneUntilReanchor = false
 local dismissedThisChallengesSession = false
+local hidingWithParent = false
 local cutoffsWatched = false
 
 local viewState = {
@@ -133,6 +135,8 @@ local HideMenus
 local ApplyAnchor
 local UpdateMinimapButton
 local StyleScroll
+local ShowMain
+local ApplyCompanionVisibility
 local specMenuOpen = false
 local fallbackSpecMenus = {}
 
@@ -171,6 +175,43 @@ local function BackgroundAlpha()
     return alpha
 end
 
+local function CompanionIsDismissed()
+    if dismissedThisChallengesSession then
+        return true
+    end
+    local saved = KeystoneMetaDB
+    return type(saved) == "table" and saved.autoShowWithChallenges == false
+end
+
+local function SetCompanionDismissed(hidden)
+    dismissedThisChallengesSession = hidden and true or false
+    local saved = KeystoneMetaDB
+    if type(saved) == "table" then
+        saved.autoShowWithChallenges = not hidden
+    end
+end
+
+local function ApplyGoldOutline(frame)
+    if not frame then
+        return
+    end
+    local outline = frame.outline
+    if not outline then
+        outline = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+        outline:SetAllPoints(frame)
+        mixBD(outline)
+        outline:SetBackdrop({
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        outline:EnableMouse(false)
+        frame.outline = outline
+    end
+    outline:SetFrameLevel((frame:GetFrameLevel() or 0) + 50)
+    outline:SetBackdropColor(0, 0, 0, 0)
+    outline:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], C.border[4] or 1)
+end
+
 local function ApplyCompanionChrome(frame)
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
@@ -185,12 +226,20 @@ local function ApplyCompanionChrome(frame)
         if frame.Bg and frame.Bg.SetAlpha then
             frame.Bg:SetAlpha(alpha)
         end
+        if frame.outline then
+            ApplyGoldOutline(frame)
+        end
         return
     end
     mixBD(frame)
     frame:SetBackdrop(BD_EDGE)
     frame:SetBackdropColor(C.bg[1], C.bg[2], C.bg[3], alpha)
-    frame:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], C.border[4] or 1)
+    if frame.outline then
+        frame:SetBackdropBorderColor(C.bg[1], C.bg[2], C.bg[3], alpha)
+        ApplyGoldOutline(frame)
+    else
+        frame:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], C.border[4] or 1)
+    end
 end
 
 local function CreateCompanionFrame(name, parent, strata)
@@ -259,35 +308,6 @@ local function CreateChromeCloseButton(parent, onClick)
     end)
     btn:SetScript("OnClick", onClick)
     return btn
-end
-
-local function CreateChromeSettingsButton(parent, closeBtn, onClick)
-    local gear = CreateFrame("Button", nil, parent)
-    gear:SetSize(16, 16)
-    if closeBtn then
-        gear:SetPoint("RIGHT", closeBtn, "LEFT", -2, 0)
-        gear:SetFrameLevel(closeBtn:GetFrameLevel())
-    else
-        gear:SetPoint("TOPRIGHT", -28, -8)
-    end
-    gear:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
-    gear:SetHighlightTexture("Interface\\Buttons\\UI-OptionsButton")
-    if gear:GetNormalTexture() then
-        gear:GetNormalTexture():SetVertexColor(0.85, 0.75, 0.40, 0.95)
-    end
-    if gear:GetHighlightTexture() then
-        gear:GetHighlightTexture():SetAlpha(0.35)
-    end
-    gear:SetScript("OnClick", onClick)
-    gear:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("Settings", 1, 0.82, 0)
-        GameTooltip:Show()
-    end)
-    gear:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
-    return gear
 end
 
 local function PanelHeightForStatus(status)
@@ -1556,7 +1576,6 @@ end
 local function HideMain()
     HideMenus()
     CloseDetail()
-    if settingsFrame then settingsFrame:Hide() end
     if mainFrame then
         mainFrame:Hide()
     end
@@ -2009,43 +2028,64 @@ local function OpenSpecMenu(anchor)
 end
 
 local function MakeSettingsCheckbox(parent, yOff, labelText, getter, setter)
-    local box = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    box:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, yOff + 2)
-    box:SetSize(24, 24)
-    local lbl = box.Text or box.text
-    if not lbl then
-        lbl = CreateFS(box, "GameFontHighlightSmall", 12, C.text)
-        lbl:SetPoint("LEFT", box, "RIGHT", 4, 0)
-    end
-    lbl:SetWordWrap(false)
+    local ROW_H = 22
+    local row = CreateFrame("Button", nil, parent)
+    row:SetSize(SETTINGS_W - 28, ROW_H)
+    row:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, yOff)
+
+    local box = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    box:SetSize(16, 16)
+    box:SetPoint("LEFT", 0, 0)
+    mixBD(box)
+    box:SetBackdrop(BD_EDGE)
+    box:SetBackdropColor(C.element[1], C.element[2], C.element[3], 1)
+    box:SetBackdropBorderColor(DIVIDER[1], DIVIDER[2], DIVIDER[3], 1)
+
+    local check = box:CreateTexture(nil, "OVERLAY")
+    check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+    check:SetSize(18, 18)
+    check:SetPoint("CENTER", 0, 0)
+    check:SetVertexColor(C.gold[1], C.gold[2], C.gold[3])
+
+    local lbl = CreateFS(row, "GameFontHighlightSmall", 12, C.text)
+    lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
     lbl:SetJustifyH("LEFT")
-    if lbl.SetWidth then
-        lbl:SetWidth(SETTINGS_W - 56)
-    end
+    lbl:SetWordWrap(false)
     SafeSetText(lbl, labelText)
-    box.label = lbl
 
     local function refresh()
-        box:SetChecked(getter() and true or false)
-        ApplyFont(lbl, 12, C.text)
+        check:SetShown(getter() and true or false)
     end
 
-    box:SetScript("OnClick", function(self)
-        setter(self:GetChecked() and true or false)
+    row:SetScript("OnClick", function()
+        setter(not getter())
         refresh()
         RefreshUI()
         pcall(PlaySound, SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
     end)
+    row:SetScript("OnEnter", function()
+        box:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    end)
+    row:SetScript("OnLeave", function()
+        box:SetBackdropBorderColor(DIVIDER[1], DIVIDER[2], DIVIDER[3], 1)
+    end)
     refreshFns[#refreshFns + 1] = refresh
     refresh()
-    return 26
+    return ROW_H
 end
 
 local function MakeSettingsSlider(parent, yOff, labelText, minVal, maxVal, step, getter, setter)
+    local ROW_H = 24
+    local TRACK_H = 10
+    local THUMB_W = 10
+    local THUMB_H = 16
+    local VALUE_W = 40
+    local GAP = 10
+
     local row = CreateFrame("Frame", nil, parent)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, yOff)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -14, yOff)
-    row:SetHeight(24)
+    row:SetHeight(ROW_H)
 
     local lbl = CreateFS(row, "GameFontHighlightSmall", 12, C.text)
     lbl:SetPoint("LEFT", 0, 0)
@@ -2056,19 +2096,33 @@ local function MakeSettingsSlider(parent, yOff, labelText, minVal, maxVal, step,
 
     local valueFs = CreateFS(row, "GameFontHighlightSmall", 12, C.gold)
     valueFs:SetPoint("RIGHT", 0, 0)
-    valueFs:SetWidth(40)
-    valueFs:SetHeight(24)
+    valueFs:SetWidth(VALUE_W)
+    valueFs:SetHeight(ROW_H)
     valueFs:SetJustifyH("RIGHT")
     valueFs:SetJustifyV("MIDDLE")
 
-    local slider = CreateFrame("Slider", nil, row, "UISliderTemplate")
+    local track = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    track:SetPoint("LEFT", lbl, "RIGHT", GAP, 0)
+    track:SetPoint("RIGHT", valueFs, "LEFT", -GAP, 0)
+    track:SetHeight(TRACK_H)
+    mixBD(track)
+    track:SetBackdrop(BD_EDGE)
+    track:SetBackdropColor(C.element[1], C.element[2], C.element[3], 1)
+    track:SetBackdropBorderColor(DIVIDER[1], DIVIDER[2], DIVIDER[3], 1)
+
+    local slider = CreateFrame("Slider", nil, track)
     slider:SetOrientation("HORIZONTAL")
-    slider:SetPoint("LEFT", lbl, "RIGHT", 8, 0)
-    slider:SetPoint("RIGHT", valueFs, "LEFT", -8, 0)
-    slider:SetHeight(17)
+    slider:SetPoint("LEFT", track, THUMB_W / 2, 0)
+    slider:SetPoint("RIGHT", track, -THUMB_W / 2, 0)
+    slider:SetHeight(TRACK_H)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
     slider:SetObeyStepOnDrag(true)
+
+    local thumb = slider:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(THUMB_W, THUMB_H)
+    thumb:SetColorTexture(C.gold[1], C.gold[2], C.gold[3], 1)
+    slider:SetThumbTexture(thumb)
 
     local updating = false
     local function refresh()
@@ -2085,9 +2139,44 @@ local function MakeSettingsSlider(parent, yOff, labelText, minVal, maxVal, step,
         SafeSetText(valueFs, string.format("%.2f", val))
         RefreshUI()
     end)
+    slider:SetScript("OnEnter", function()
+        track:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 0.9)
+    end)
+    slider:SetScript("OnLeave", function()
+        track:SetBackdropBorderColor(DIVIDER[1], DIVIDER[2], DIVIDER[3], 1)
+    end)
     refreshFns[#refreshFns + 1] = refresh
     refresh()
-    return 28
+    return ROW_H
+end
+
+local function MakeSettingsButton(parent, yOff, labelText, onClick)
+    local ROW_H = 24
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    btn:SetSize(SETTINGS_W - 28, ROW_H)
+    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, yOff)
+    mixBD(btn)
+    btn:SetBackdrop(BD_EDGE)
+    btn:SetBackdropColor(C.element[1], C.element[2], C.element[3], 1)
+    btn:SetBackdropBorderColor(DIVIDER[1], DIVIDER[2], DIVIDER[3], 0.6)
+
+    local lbl = CreateFS(btn, "GameFontHighlightSmall", 12, C.text)
+    lbl:SetPoint("CENTER")
+    SafeSetText(lbl, labelText)
+
+    btn:SetScript("OnEnter", function()
+        btn:SetBackdropBorderColor(C.gold[1], C.gold[2], C.gold[3], 0.9)
+    end)
+    btn:SetScript("OnLeave", function()
+        btn:SetBackdropBorderColor(DIVIDER[1], DIVIDER[2], DIVIDER[3], 0.6)
+    end)
+    btn:SetScript("OnClick", function()
+        if onClick then
+            onClick()
+        end
+        pcall(PlaySound, SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
+    end)
+    return ROW_H
 end
 
 local function SaveSettingsPosition()
@@ -2109,16 +2198,8 @@ local function PlaceSettingsWindow()
     local pos = db() and db().settingsPosition
     if pos and pos.point then
         settingsFrame:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x or 0, pos.y or 0)
-    elseif mainFrame and mainFrame:IsShown() and mainFrame:GetLeft() then
-        local left = mainFrame:GetLeft()
-        local parentLeft = (UIParent and UIParent:GetLeft()) or 0
-        if (left - parentLeft) >= (SETTINGS_W + SCREEN_MARGIN + 12) then
-            settingsFrame:SetPoint("TOPRIGHT", mainFrame, "TOPLEFT", -12, 0)
-        else
-            settingsFrame:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", 12, 0)
-        end
     else
-        settingsFrame:SetPoint("CENTER", UIParent, "CENTER", -220, 40)
+        settingsFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     end
     ClampFrameToUIParent(settingsFrame)
 end
@@ -2126,60 +2207,158 @@ end
 local function CreateSettingsWindow()
     if settingsFrame then return end
 
-    local win = CreateCompanionFrame("KeystoneMetaSettingsFrame", UIParent, "DIALOG")
+    local BAR_H = 30
+    local TAB_BAR_H = 26
+    local win = CreateFrame("Frame", "KeystoneMetaSettingsFrame", UIParent, "BackdropTemplate")
     settingsFrame = win
     win:SetWidth(SETTINGS_W)
+    win:SetFrameStrata("DIALOG")
+    win:SetToplevel(true)
     win:SetMovable(true)
-    win:RegisterForDrag("LeftButton")
-    if win.SetClipsChildren then
-        win:SetClipsChildren(false)
-    end
+    win:EnableMouse(true)
+    win:SetClampedToScreen(true)
+    ApplyGoldOutline(win)
+    ApplyCompanionChrome(win)
     win:Hide()
     tinsert(UISpecialFrames, "KeystoneMetaSettingsFrame")
-    win:SetScript("OnDragStart", function() win:StartMoving() end)
-    win:SetScript("OnDragStop", function()
+
+    local titleBar = CreateFrame("Frame", nil, win)
+    titleBar:SetHeight(BAR_H)
+    titleBar:SetPoint("TOPLEFT", win, "TOPLEFT", 1, -1)
+    titleBar:SetPoint("TOPRIGHT", win, "TOPRIGHT", -1, -1)
+    titleBar:SetFrameLevel(win:GetFrameLevel() + 3)
+    titleBar:EnableMouse(true)
+    titleBar:RegisterForDrag("LeftButton")
+    titleBar:SetScript("OnDragStart", function() win:StartMoving() end)
+    titleBar:SetScript("OnDragStop", function()
         win:StopMovingOrSizing()
         ClampFrameToUIParent(win)
         SaveSettingsPosition()
     end)
+
+    local titleBg = titleBar:CreateTexture(nil, "BACKGROUND")
+    titleBg:SetAllPoints()
+    titleBg:SetColorTexture(C.surface[1], C.surface[2], C.surface[3], 1)
+
+    local titleTxt = CreateFS(titleBar, "GameFontNormal", 13, C.gold)
+    titleTxt:SetPoint("LEFT", 12, 0)
+    titleTxt:SetJustifyH("LEFT")
+    titleTxt:SetWordWrap(false)
+    SafeSetText(titleTxt, "|cFFFFD100Keystone Meta|r |cFF555555— Settings|r")
+    win.title = titleTxt
+
     win.close = CreateChromeCloseButton(win, function()
         HideMenus()
         win:Hide()
     end)
-
-    win.title = CreateFS(win, "GameFontNormal", 13, C.gold)
-    win.title:SetPoint("TOPLEFT", PAD, -10)
-    win.title:SetPoint("RIGHT", win.close, "LEFT", -6, 0)
-    win.title:SetJustifyH("LEFT")
-    SafeSetText(win.title, "Keystone Meta Settings")
+    win.close:SetFrameLevel(win:GetFrameLevel() + 10)
 
     local sep = CreateThinDivider(win)
-    sep:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -30)
-    sep:SetPoint("TOPRIGHT", win, "TOPRIGHT", -PAD, -30)
+    sep:SetPoint("TOPLEFT", win, "TOPLEFT", 1, -BAR_H)
+    sep:SetPoint("TOPRIGHT", win, "TOPRIGHT", -1, -BAR_H)
 
-    local inset = CreateFrame("Frame", nil, win)
-    inset:SetPoint("TOPLEFT", PAD, -36)
-    inset:SetPoint("BOTTOMRIGHT", -PAD, PAD)
-    if inset.SetClipsChildren then
-        inset:SetClipsChildren(false)
+    local tabContainers = {}
+    local tabButtons = {}
+    local function showTab(name)
+        for key, frm in pairs(tabContainers) do
+            frm:SetShown(key == name)
+        end
+        for key, btn in pairs(tabButtons) do
+            btn.underline:SetShown(key == name)
+            ApplyFont(btn.label, 13, key == name and C.gold or C.muted2)
+        end
     end
-    inset:SetFrameLevel(win:GetFrameLevel() + 5)
-    win.inset = inset
 
-    local y = -4
-    y = y - MakeSettingsCheckbox(inset, y, "Follow current specialization", function()
+    local function makeTabButton(name, labelText, xOff)
+        local b = CreateFrame("Button", nil, win)
+        b:SetSize(92, TAB_BAR_H)
+        b:SetPoint("TOPLEFT", win, "TOPLEFT", xOff, -BAR_H - 4)
+        b.label = CreateFS(b, "GameFontNormal", 13, C.muted2)
+        b.label:SetPoint("CENTER", 0, 2)
+        SafeSetText(b.label, labelText)
+        b.underline = b:CreateTexture(nil, "OVERLAY")
+        b.underline:SetHeight(2)
+        b.underline:SetPoint("BOTTOMLEFT", 6, 0)
+        b.underline:SetPoint("BOTTOMRIGHT", -6, 0)
+        b.underline:SetColorTexture(C.gold[1], C.gold[2], C.gold[3], 1)
+        b.underline:Hide()
+        b:SetScript("OnClick", function()
+            showTab(name)
+            pcall(PlaySound, SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
+        end)
+        b:SetScript("OnEnter", function()
+            if not b.underline:IsShown() then
+                ApplyFont(b.label, 13, C.text)
+            end
+        end)
+        b:SetScript("OnLeave", function()
+            if not b.underline:IsShown() then
+                ApplyFont(b.label, 13, C.muted2)
+            end
+        end)
+        tabButtons[name] = b
+        return b
+    end
+
+    makeTabButton("display", "Display", 14)
+    makeTabButton("customize", "Customize", 112)
+
+    local tabSep = CreateThinDivider(win)
+    tabSep:SetPoint("TOPLEFT", win, "TOPLEFT", 1, -BAR_H - 4 - TAB_BAR_H)
+    tabSep:SetPoint("TOPRIGHT", win, "TOPRIGHT", -1, -BAR_H - 4 - TAB_BAR_H)
+
+    local function makeTabFrame(name)
+        local f = CreateFrame("Frame", nil, win)
+        f:SetPoint("TOPLEFT", win, "TOPLEFT", 0, -BAR_H - 5 - TAB_BAR_H)
+        f:SetWidth(SETTINGS_W)
+        f:SetHeight(1)
+        tabContainers[name] = f
+        return f
+    end
+
+    local display = makeTabFrame("display")
+    local customize = makeTabFrame("customize")
+
+    local function sectionLabel(parent, text, yOff)
+        local fs = CreateFS(parent, "GameFontNormalSmall", 11, C.gold)
+        fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, yOff)
+        fs:SetWordWrap(false)
+        SafeSetText(fs, text)
+        return fs
+    end
+
+    local function divider(parent, yOff)
+        local line = CreateThinDivider(parent)
+        line:SetPoint("TOPLEFT", parent, "TOPLEFT", 14, yOff)
+        line:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -14, yOff)
+        return line
+    end
+
+    local dy = -10
+    sectionLabel(display, "DISPLAY", dy)
+    dy = dy - 18
+    dy = dy - MakeSettingsCheckbox(display, dy, "Show with Group Finder", function()
+        return not CompanionIsDismissed()
+    end, function(v)
+        SetCompanionDismissed(not v)
+        ApplyCompanionVisibility()
+    end) - 6
+    dy = dy - MakeSettingsCheckbox(display, dy, "Follow current specialization", function()
         return db() and db().followCurrentSpec
     end, function(v)
         if db() then db().followCurrentSpec = v end
-    end) - 2
-
-    y = y - MakeSettingsCheckbox(inset, y, "Compact rows", function()
+    end) - 6
+    dy = dy - MakeSettingsCheckbox(display, dy, "Compact rows", function()
         return db() and db().compactRows
     end, function(v)
         if db() then db().compactRows = v end
-    end) - 2
-
-    y = y - MakeSettingsCheckbox(inset, y, "Minimap button", function()
+    end) - 6
+    dy = dy - MakeSettingsCheckbox(display, dy, "Daily movement", function()
+        return db() and db().showDailyMovement
+    end, function(v)
+        if db() then db().showDailyMovement = v end
+    end) - 6
+    dy = dy - MakeSettingsCheckbox(display, dy, "Show Minimap Button", function()
         return db() and not (db().minimap and db().minimap.hide)
     end, function(v)
         if db() then
@@ -2187,31 +2366,53 @@ local function CreateSettingsWindow()
             db().minimap.hide = not v
             if UpdateMinimapButton then UpdateMinimapButton() end
         end
-    end) - 2
+    end) - 10
+    display:SetHeight(math.abs(dy))
 
-    y = y - MakeSettingsCheckbox(inset, y, "Daily movement", function()
-        return db() and db().showDailyMovement
-    end, function(v)
-        if db() then db().showDailyMovement = v end
-    end) - 8
-
-    y = y - MakeSettingsSlider(inset, y, "UI scale", 0.80, 1.20, 0.05, function()
+    local cy = -10
+    sectionLabel(customize, "PANEL", cy)
+    cy = cy - 18
+    cy = cy - MakeSettingsSlider(customize, cy, "UI scale", 0.80, 1.20, 0.05, function()
         return (db() and db().uiScale) or 1
     end, function(v)
         if db() then db().uiScale = v end
-    end) - 8
-
-    y = y - MakeSettingsSlider(inset, y, "Background opacity", 0.20, 1.00, 0.05, function()
+    end) - 6
+    cy = cy - MakeSettingsSlider(customize, cy, "Background opacity", 0.20, 1.00, 0.05, function()
         return BackgroundAlpha()
     end, function(v)
         if db() then db().bgOpacity = v end
         ApplyCompanionChrome(win)
         if mainFrame then ApplyCompanionChrome(mainFrame) end
         if detailFrame then ApplyCompanionChrome(detailFrame) end
-    end)
+    end) - 10
+    divider(customize, cy)
+    cy = cy - 14
+    sectionLabel(customize, "POSITION", cy)
+    cy = cy - 18
+    cy = cy - MakeSettingsButton(customize, cy, "Reset Panel Position", function()
+        if db() then
+            db().windowPosition = nil
+            db().attachedOffset = nil
+        end
+        holdStandaloneUntilReanchor = false
+        if mainFrame and mainFrame:IsShown() then
+            ApplyAnchor()
+            PositionPanels()
+        end
+    end) - 8
+    local hintFs = CreateFS(customize, "GameFontHighlightSmall", 11, C.muted2)
+    hintFs:SetPoint("TOPLEFT", customize, "TOPLEFT", 14, cy)
+    hintFs:SetPoint("TOPRIGHT", customize, "TOPRIGHT", -14, cy)
+    hintFs:SetJustifyH("LEFT")
+    hintFs:SetWordWrap(true)
+    SafeSetText(hintFs, "Tip: Drag the Keystone Meta panel to reposition it.")
+    cy = cy - 32
+    customize:SetHeight(math.abs(cy))
 
-    win:SetHeight(math.abs(y) + 48)
+    win:SetSize(SETTINGS_W, BAR_H + 1 + TAB_BAR_H + 1 + math.max(display:GetHeight(), customize:GetHeight()) + 8)
     win:SetScript("OnHide", HideMenus)
+    ApplyGoldOutline(win)
+    showTab("display")
 end
 
 local function ToggleSettings()
@@ -2447,14 +2648,13 @@ local function CreateMainPanel()
     end)
 
     frame.close = CreateChromeCloseButton(frame, function()
-        dismissedThisChallengesSession = true
+        SetCompanionDismissed(true)
         HideMain()
     end)
-    frame.settingsBtn = CreateChromeSettingsButton(frame, frame.close, ToggleSettings)
 
     frame.title = CreateFS(frame, "GameFontNormalLarge", TITLE_SIZE, C.gold)
     frame.title:SetPoint("TOPLEFT", PAD, -TOP_PAD)
-    frame.title:SetPoint("RIGHT", frame.settingsBtn, "LEFT", -6, 0)
+    frame.title:SetPoint("RIGHT", frame.close, "LEFT", -6, 0)
     frame.title:SetJustifyH("LEFT")
     SafeSetText(frame.title, "Keystone Meta")
 
@@ -2933,9 +3133,8 @@ RefreshUI = function()
     PositionPanels()
 end
 
-local function ShowMain()
+ShowMain = function()
     EnsureUI()
-    dismissedThisChallengesSession = false
     local player = PlayerSpec()
     if player and (not viewState.specId or (db() and db().followCurrentSpec)) then
         viewState.specId = player.id
@@ -2953,15 +3152,24 @@ local function ShowMain()
     end
 end
 
-local function ToggleWindow()
-    EnsureUI()
-    if mainFrame and mainFrame:IsShown() then
-        dismissedThisChallengesSession = true
+ApplyCompanionVisibility = function()
+    if CompanionIsDismissed() then
         HideMain()
         return
     end
-    dismissedThisChallengesSession = false
-    ShowMain()
+    if IsChallengesVisible() then
+        ShowMain()
+    end
+end
+
+local function ToggleWindow()
+    SetCompanionDismissed(not CompanionIsDismissed())
+    ApplyCompanionVisibility()
+    if settingsFrame and settingsFrame:IsShown() then
+        for _, fn in ipairs(refreshFns) do
+            fn()
+        end
+    end
 end
 
 local function ReevaluatePlacement()
@@ -2975,7 +3183,7 @@ end
 local function OnChallengesShow()
     EnsureUI()
     holdStandaloneUntilReanchor = false
-    if dismissedThisChallengesSession then
+    if CompanionIsDismissed() then
         return
     end
     ShowMain()
@@ -2984,7 +3192,9 @@ end
 
 local function OnChallengesHide()
     holdStandaloneUntilReanchor = false
+    hidingWithParent = true
     HideMain()
+    hidingWithParent = false
 end
 
 local function WatchCutoffs()
@@ -3020,6 +3230,14 @@ local function HookChallenges()
         ChallengesFrame:HookScript("OnHide", OnChallengesHide)
     end
     WatchCutoffs()
+    if PVEFrame and PVEFrame.HookScript then
+        PVEFrame:HookScript("OnShow", function()
+            if ChallengesFrame and ChallengesFrame.IsShown and ChallengesFrame:IsShown() then
+                OnChallengesShow()
+            end
+        end)
+        PVEFrame:HookScript("OnHide", OnChallengesHide)
+    end
     if ChallengesFrame.IsShown and ChallengesFrame:IsShown() then
         OnChallengesShow()
     end
@@ -3033,13 +3251,17 @@ local function InitializeMinimap()
         type = "launcher",
         text = "Keystone Meta",
         icon = "Interface\\AddOns\\KeystoneMeta\\Assets\\KeystoneMeta_logo",
-        OnClick = function()
-            ToggleWindow()
+        OnClick = function(_, button)
+            if button == "RightButton" then
+                ToggleWindow()
+            else
+                ToggleSettings()
+            end
         end,
         OnTooltipShow = function(tt)
             tt:AddLine("|cFFFFD100Keystone Meta|r")
-            tt:AddLine("Specialization representation among sampled top-ranked completed runs.", 0.85, 0.85, 0.85, true)
-            tt:AddLine("Left-click: Toggle panel", 0.7, 0.7, 0.7)
+            tt:AddLine("|cFFFFFFFFLeft-click:|r Open settings", 0.85, 0.85, 0.85)
+            tt:AddLine("|cFFFFFFFFRight-click:|r Toggle Group Finder panel", 0.85, 0.85, 0.85)
         end,
     })
     KeystoneMetaDB.minimap = KeystoneMetaDB.minimap or { hide = false }

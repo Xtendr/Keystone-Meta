@@ -60,7 +60,8 @@ class PresentationContractTests(TestCase):
         self.assertIn("if status ~= \"ok\" then", self.lua)
         self.assertIn("ReleaseRows(dungeonRows)", self.lua)
         self.assertIn("ShowEmptyState", self.lua)
-        self.assertIn("Keystone Meta Settings", self.lua)
+        self.assertIn("Keystone Meta", self.lua)
+        self.assertIn("— Settings", self.lua)
 
     def test_dashboard_presentation_is_gone(self):
         for remnant in (
@@ -82,7 +83,7 @@ class PresentationContractTests(TestCase):
         self.assertIn("MAIN_H_PENDING = 220", self.lua)
         self.assertIn("MAIN_H_POPULATED = 370", self.lua)
         self.assertRegex(self.lua, r"DETAIL_W,\s*DETAIL_H\s*=\s*348,\s*380")
-        self.assertIn("SETTINGS_W = 298", self.lua)
+        self.assertIn("SETTINGS_W = 340", self.lua)
         self.assertNotEqual("220", "370")
         self.assertGreaterEqual(318, 300)
         self.assertLessEqual(318, 325)

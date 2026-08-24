@@ -168,18 +168,41 @@ class LuaPlacementContractTests(TestCase):
         )[0]
         self.assertIn("ShowMain()", show)
         self.assertIn("ScheduleReanchor()", show)
-        self.assertIn("if dismissedThisChallengesSession then", show)
+        self.assertIn("CompanionIsDismissed()", show)
         self.assertIn("HideMain()", hide)
+        self.assertIn("hidingWithParent = true", hide)
         self.assertNotIn("dismissedThisChallengesSession = false", hide)
         self.assertNotIn("RestoreStandalonePosition()", hide)
-        toggle = self.lua.split("local function ToggleWindow()", 1)[1].split(
-            "local function ReevaluatePlacement()", 1
-        )[0]
-        self.assertIn("dismissedThisChallengesSession = true", toggle)
-        self.assertNotIn("IsChallengesVisible()", toggle)
+        toggle = self.lua.split("local function ToggleWindow()", 1)
+        if len(toggle) < 2:
+            toggle = self.lua.split("ToggleWindow = function()", 1)
+        toggle = toggle[1].split("local function ReevaluatePlacement()", 1)[0]
+        self.assertIn("SetCompanionDismissed(not CompanionIsDismissed())", toggle)
+        self.assertIn("ApplyCompanionVisibility()", toggle)
+        visibility = self.lua.split("ApplyCompanionVisibility = function()", 1)[1].split(
+            "ToggleWindow = function()", 1
+        )
+        if len(visibility) < 2:
+            visibility = self.lua.split("ApplyCompanionVisibility = function()", 1)[1].split(
+                "local function ToggleWindow()", 1
+            )[0]
+        else:
+            visibility = visibility[0]
+        self.assertIn("IsChallengesVisible()", visibility)
+        self.assertIn("ShowMain()", visibility)
+        self.assertIn("HideMain()", visibility)
+        main = self._create_main_panel()
+        on_hide = main.split('frame:SetScript("OnHide"', 1)[1].split("frame.close", 1)[0]
+        self.assertNotIn("SetCompanionDismissed", on_hide)
+        self.assertIn("SetCompanionDismissed(true)", main)
+        self.assertNotIn("settingsBtn", main)
+        self.assertNotIn("CreateChromeSettingsButton", self.lua)
+        self.assertIn("Show with Group Finder", self.lua)
         hook = self.lua.split("local function HookChallenges()", 1)[1].split(
             "local function InitializeMinimap()", 1
         )[0]
+        self.assertIn("PVEFrame:HookScript(\"OnShow\"", hook)
+        self.assertIn("PVEFrame:HookScript(\"OnHide\", OnChallengesHide)", hook)
         self.assertIn("ChallengesFrame:IsShown()", hook)
         self.assertIn("OnChallengesShow()", hook)
 
@@ -187,7 +210,7 @@ class LuaPlacementContractTests(TestCase):
         self.assertIn("MAIN_H_PENDING = 220", self.lua)
         self.assertIn("MAIN_H_POPULATED = 370", self.lua)
         self.assertIn("MAIN_W = 318", self.lua)
-        self.assertIn("SETTINGS_W = 298", self.lua)
+        self.assertIn("SETTINGS_W = 340", self.lua)
         self.assertIn("MAIN_H_MAX = 480", self.lua)
         self.assertIn("TOOLTIP_MAX_WIDTH = 280", self.lua)
 
@@ -287,15 +310,30 @@ class LuaPlacementContractTests(TestCase):
         settings = self.lua.split("local function CreateSettingsWindow()", 1)[1].split(
             "local function ToggleSettings()", 1
         )[0]
-        self.assertIn('inset:SetPoint("BOTTOMRIGHT"', settings)
+        self.assertIn('makeTabButton("display", "Display"', settings)
+        self.assertIn('makeTabButton("customize", "Customize"', settings)
+        self.assertIn("ApplyGoldOutline(win)", settings)
+        self.assertIn("Show with Group Finder", settings)
         self.assertIn("MakeSettingsCheckbox", settings)
         self.assertIn("MakeSettingsSlider", settings)
+        self.assertIn("MakeSettingsButton", settings)
+        self.assertIn("Reset Panel Position", settings)
         self.assertNotIn("MakeSettingsDropdown", settings)
         self.assertIn("Background opacity", settings)
         self.assertNotIn('y, "Font"', settings)
-        self.assertIn("UICheckButtonTemplate", self.lua)
+        self.assertIn("UI-CheckBox-Check", self.lua)
         self.assertNotIn("WowStyle1DropdownTemplate", self.lua)
-        self.assertIn("UISliderTemplate", self.lua)
+        self.assertNotIn("UICheckButtonTemplate", self.lua)
+        self.assertNotIn("UISliderTemplate", self.lua)
+        self.assertIn("SetThumbTexture", self.lua)
+        minimap = self.lua.split("local function InitializeMinimap()", 1)[1].split(
+            "UpdateMinimapButton = function()", 1
+        )[0]
+        self.assertIn('button == "RightButton"', minimap)
+        self.assertIn("ToggleWindow()", minimap)
+        self.assertIn("ToggleSettings()", minimap)
+        self.assertIn("Left-click:|r Open settings", minimap)
+        self.assertIn("Right-click:|r Toggle Group Finder panel", minimap)
 
     def test_footer_does_not_wrap(self):
         main = self._create_main_panel()
@@ -381,8 +419,9 @@ class LuaPlacementContractTests(TestCase):
         self.assertNotIn("Center:SetColorTexture", chrome)
         self.assertLess(chrome.find("if frame.NineSlice then"), chrome.find("SetBackdropColor"))
         self.assertNotIn("WowStyle1DropdownTemplate", self.lua)
-        self.assertIn("UISliderTemplate", self.lua)
-        self.assertIn("UICheckButtonTemplate", self.lua)
+        self.assertNotIn("UISliderTemplate", self.lua)
+        self.assertNotIn("UICheckButtonTemplate", self.lua)
+        self.assertIn("UI-CheckBox-Check", self.lua)
         self.assertNotIn("SettingsCheckboxTemplate", self.lua)
 
     def test_uses_copied_local_assets_only(self):
