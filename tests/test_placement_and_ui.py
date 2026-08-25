@@ -251,6 +251,11 @@ class LuaPlacementContractTests(TestCase):
         self.assertNotIn("TOOLTIP_MIN_WIDTH", self.lua)
         self.assertIn("function AnchorTooltipOutside", self.lua)
         self.assertIn("function ChooseTooltipSide", self.lua)
+        self.assertIn("function ClampOwnedTooltipLines", self.lua)
+        self.assertIn("function FitOwnedTooltip", self.lua)
+        self.assertIn("TextRight", self.lua)
+        self.assertIn("FitOwnedTooltip(tooltip)", self.lua)
+        self.assertNotIn("percentage points since last valid update", self.lua)
         self.assertIn("GetObjectivesRect", self.lua)
 
     def test_pending_hides_populated_rows(self):

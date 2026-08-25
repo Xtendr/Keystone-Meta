@@ -1202,6 +1202,52 @@ local function AnchorTooltipOutside(owner, tooltip)
     end
 end
 
+local function ClampOwnedTooltipLines(tooltip)
+    local name = tooltip and tooltip.GetName and tooltip:GetName()
+    local count = tooltip and tooltip.NumLines and tooltip:NumLines()
+    if not name or not count then
+        return
+    end
+    local pad = 12
+    local inner = TOOLTIP_MAX_WIDTH - pad * 2
+    local i = 1
+    while i <= count do
+        local left = _G[name .. "TextLeft" .. i]
+        local right = _G[name .. "TextRight" .. i]
+        if right and right.IsShown and right:IsShown() then
+            right:ClearAllPoints()
+            if left then
+                right:SetPoint("TOP", left, "TOP", 0, 0)
+            end
+            right:SetPoint("RIGHT", tooltip, "RIGHT", -pad, 0)
+            right:SetJustifyH("RIGHT")
+            local leftW = 0
+            if left and left.GetStringWidth then
+                leftW = left:GetStringWidth() or 0
+            end
+            if right.SetWidth then
+                right:SetWidth(math.max(48, inner - leftW - 8))
+            end
+            if right.SetWordWrap then
+                right:SetWordWrap(true)
+            end
+        elseif left and left.SetWidth then
+            left:SetWidth(inner)
+            if left.SetWordWrap then
+                left:SetWordWrap(true)
+            end
+        end
+        i = i + 1
+    end
+end
+
+local function FitOwnedTooltip(tooltip)
+    if tooltip and tooltip.SetWidth and (tooltip:GetWidth() or 0) > TOOLTIP_MAX_WIDTH then
+        tooltip:SetWidth(TOOLTIP_MAX_WIDTH)
+    end
+    ClampOwnedTooltipLines(tooltip)
+end
+
 local function ShowOwnedTooltip(owner, tooltip, builder)
     tooltip:SetOwner(owner, "ANCHOR_NONE")
     tooltip:ClearLines()
@@ -1210,9 +1256,7 @@ local function ShowOwnedTooltip(owner, tooltip, builder)
     end
     builder(owner, tooltip)
     tooltip:Show()
-    if tooltip.SetWidth and (tooltip:GetWidth() or 0) > TOOLTIP_MAX_WIDTH then
-        tooltip:SetWidth(TOOLTIP_MAX_WIDTH)
-    end
+    FitOwnedTooltip(tooltip)
     AnchorTooltipOutside(owner, tooltip)
 end
 
@@ -1244,9 +1288,7 @@ local function InfoTooltip(owner, tooltip)
     tooltip:AddLine("World, full season. Source: Raider.IO", C.muted[1], C.muted[2], C.muted[3], true)
     tooltip:AddLine("Representation shows popularity in the sampled runs. It does not measure specialization strength or success rate.", C.gold[1], C.gold[2], C.gold[3], true)
     tooltip:Show()
-    if tooltip.SetWidth and (tooltip:GetWidth() or 0) > TOOLTIP_MAX_WIDTH then
-        tooltip:SetWidth(TOOLTIP_MAX_WIDTH)
-    end
+    FitOwnedTooltip(tooltip)
     AnchorTooltipOutside(owner, tooltip)
 end
 
@@ -1304,17 +1346,17 @@ local function DungeonRowTooltip(row, tooltip)
         end
         local sample = dungeon.sample or {}
         if type(sample.validRuns) == "number" and sample.validRuns > 0 then
-            tooltip:AddDoubleLine("Sample", string.format("%d completed ranked runs", sample.validRuns), 0.7, 0.7, 0.7, 1, 1, 1)
+            tooltip:AddDoubleLine("Sample", string.format("%d runs", sample.validRuns), 0.7, 0.7, 0.7, 1, 1, 1)
         end
         if db() and db().showDailyMovement and type(spec.deltaPercentagePoints) == "number" then
             local delta = spec.deltaPercentagePoints
             local text
             if math.abs(delta) < 0.05 then
-                text = "unchanged since last valid update"
+                text = "unchanged since last update"
             elseif delta > 0 then
-                text = string.format("+%.1f percentage points since last valid update", delta)
+                text = string.format("+%.1f since last update", delta)
             else
-                text = string.format("%.1f percentage points since last valid update", delta)
+                text = string.format("%.1f since last update", delta)
             end
             tooltip:AddDoubleLine("Change", text, 0.7, 0.7, 0.7, 1, 1, 1)
         end
@@ -1345,7 +1387,7 @@ local function SpecRowTooltip(row, tooltip)
     local dungeon = row.dungeon
     local sample = dungeon and dungeon.sample or {}
     if type(sample.validRuns) == "number" and sample.validRuns > 0 then
-        tooltip:AddDoubleLine("Sample", string.format("%d completed ranked runs", sample.validRuns), 0.7, 0.7, 0.7, 1, 1, 1)
+        tooltip:AddDoubleLine("Sample", string.format("%d runs", sample.validRuns), 0.7, 0.7, 0.7, 1, 1, 1)
     end
     local seats = 0
     local role = viewState.detailRole or CurrentRole()
