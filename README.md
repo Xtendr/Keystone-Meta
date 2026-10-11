@@ -2,6 +2,10 @@
 
 See what the highest-ranked Mythic+ groups are actually playing today.
 
+<p align="center">
+  <a href="https://www.buymeacoffee.com/xtendr"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40"></a>
+</p>
+
 Keystone Meta is a standalone World of Warcraft addon that ships a pre-generated, daily-updated snapshot of specialization representation in ranked Mythic+ runs. The addon never calls the internet from inside the game.
 
 **Keystone Meta shows specialization representation among sampled top-ranked completed Mythic+ runs. Representation does not measure success rate or prove specialization strength.**
