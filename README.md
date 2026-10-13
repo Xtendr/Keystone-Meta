@@ -88,7 +88,7 @@ update.
 
 Choose whether the panel opens together with the Group Finder, and set its size, background opacity and compact rows in
 the settings. With Group Finder closed, you can drag it anywhere as a standalone window. It needs no other addon, and
-when [Keystone Cutoffs](https://github.com/Xtendr/Keystone-Cutoffs) is on too, the two sit neatly side by side.
+when [Keystone Cutoffs](https://github.com/Xtendr/KeystoneCutoffs) is on too, the two sit neatly side by side.
 
 ## Getting started
 
@@ -111,7 +111,7 @@ The exact sample size is shown for every dungeon. For the full details, see [how
 
 ## Feedback
 
-Have an idea, found a bug or missing a feature? [Open an issue](https://github.com/Xtendr/Keystone-Meta/issues)
+Have an idea, found a bug or missing a feature? [Open an issue](https://github.com/Xtendr/KeystoneMeta/issues)
 here on GitHub or leave a comment on [CurseForge](https://www.curseforge.com/wow/addons/keystonemeta).
 
 ## Credits
