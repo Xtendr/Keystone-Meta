@@ -1,8 +1,8 @@
-## Interface: 120100
+## Interface: 120100, 120105
 ## Title: Keystone Meta
 ## Notes: Daily Mythic+ specialization representation among sampled top-ranked runs.
 ## Author: Xtendr
-## Version: 0.1.0
+## Version: 0.1.1
 ## IconTexture: Interface\AddOns\KeystoneMeta\Assets\KeystoneMeta_logo
 ## SavedVariables: KeystoneMetaDB
 ## X-Curse-Project-ID: 1660185
